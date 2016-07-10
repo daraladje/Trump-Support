@@ -1,0 +1,8 @@
+Package: FuckDonaldTrump
+Type: File
+Title: Trump Support: A Map Visualization
+Version: 0.1.0
+Author: Dara Ladjevardian, Carlos Couce, Matt Clynes
+Description: By analyzing Trump's tweets, follower retweets, and positive/negative comments about him, we've created a visual map that shows where his supporters and haters truly reside.
+License: Ladjevardian
+LazyData: TRUE
