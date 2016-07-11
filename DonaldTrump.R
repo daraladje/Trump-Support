@@ -1,3 +1,5 @@
+#!/usr/local/bin/Rscript
+
 library(ggplot2)
 library(twitteR)
 library(ROAuth)
@@ -20,15 +22,12 @@ access_token <- "750683362650566656-RiPSDKN4Q7pYvZgzz9U7m06aHEMSg45"
 access_token_secret <- "D47dlD1P0kRgJhnKOlDqzEg74vfwHKyW2Lt9LBs6m3AB9"
 setup_twitter_oauth(api_key, api_secret, access_token, access_token_secret)
 setwd("/Users/DaraLadje/Documents/TwitterBot")
-tweets_donny <- searchTwitter('@realDonaldTrump', n=500,lang = 'en', since=as.character(Sys.Date()-1)) #since 24 hours ago
+tweets_donny <- searchTwitter('@realDonaldTrump', n=1000,lang = 'en', since=as.character(Sys.Date()-1)) #since 24 hours ago
 library(plyr)
 tweets_donny.df <- twListToDF(tweets_donny)
 
-#Above code connects to Twitter account. Takes in tweets that have Donald Trump's twitter handle
-
 
 TrumpRetweet<-filter(tweets_donny.df,isRetweet==TRUE)
-#separate retweets and actual comments
 TrumpComment<-filter(tweets_donny.df,isRetweet==FALSE)
 
 
@@ -46,7 +45,7 @@ boo = scan('negative-words.txt',
 bad_text = c(boo)
 good_text = c(yay)
 
-#sentimentality algorithm to separate the positive tweets from the negative ones
+
 score.sentiment = function(sentences, good_text, bad_text, .progress='none')
 {
   require(plyr)
@@ -94,57 +93,73 @@ MakeAmericaGreat <- score.sentiment(feed_donny, good_text, bad_text, .progress='
 # Cut the text, just gets in the way
 # Remove neutral values of 0
 
-MakeAmericaGreat<-filter(MakeAmericaGreat,MakeAmericaGreat$score != 0) #neutral scores not needed
+MakeAmericaGreat<-filter(MakeAmericaGreat,MakeAmericaGreat$score != 0)
 MakeAmericaGreat<-MakeAmericaGreat[!grepl("RT ", MakeAmericaGreat$text),]
 
-proTrump<-filter(MakeAmericaGreat,score>0) #trump supporters
-antiTrump<-filter(MakeAmericaGreat,score<0) #trump haters
+proTrump<-filter(MakeAmericaGreat,score>0)
+antiTrump<-filter(MakeAmericaGreat,score<0)
 
 
 
 proTrump$text<-as.character(proTrump$text)
 antiTrump$text<-as.character(antiTrump$text)
 
-proTrumpName<-dplyr::select(merge(proTrump,TrumpComment),screenName) #add the username to the tweets
+proTrumpName<-dplyr::select(merge(proTrump,TrumpComment),screenName)
 antiTrumpName<-dplyr::select(merge(antiTrump,TrumpComment),screenName)
 
+coordinates<-read.csv("/Users/DaraLadje/Downloads/worldcitiespop.csv")
+coordinates<-dplyr::select(coordinates,City,Latitude,Longitude)
 
-#get the location on someone's profile
-#this location is only available if the user has a public profile
-#the location may not even be real
-#geocode determines the coordinates to the best of its ability
+
 prolocations<-sapply(proTrumpName$screenName,function(x){getUser(x)$location})
 proTrumpName$location<-prolocations
 proTrumpName<-filter(proTrumpName, location!="",location!="NULL")
-proTrumpName<-proTrumpName[tolower(gsub(",.*$", "", proTrumpName$location)) %in% coordinates$City,]
-proLocations<-dplyr::select(proTrumpName,location)
-proDots<-dplyr::select(geocode(proLocations$location),longitude,latitude)
+if(proTrumpName[1,2]=="NULL")
+{
+  proDots<-dplyr::select(geocode("Houston, Texas"),longitude,latitude)
+} else
+{
+  proTrumpName<-proTrumpName[tolower(gsub(",.*$", "", proTrumpName$location)) %in% coordinates$City,]
+  proLocations<-dplyr::select(proTrumpName,location)
+  proDots<-dplyr::select(geocode(proLocations$location),longitude,latitude)
+}
 
 antilocations<-sapply(antiTrumpName$screenName,function(x){getUser(x)$location})
 antiTrumpName$location<-antilocations
 antiTrumpName<-filter(antiTrumpName, location!="",location!="NULL")
-antiTrumpName<-antiTrumpName[tolower(gsub(",.*$", "", antiTrumpName$location)) %in% coordinates$City,]
-antiLocations<-dplyr::select(antiTrumpName,location)
-antiDots<-dplyr::select(geocode(antiLocations$location),longitude,latitude)
+if(antiTrumpName[1,2]=="NULL")
+{
+  antiDots<-dplyr::select(geocode("Houston, Texas"),longitude,latitude)
+} else
+{
+  antiTrumpName<-antiTrumpName[tolower(gsub(",.*$", "", antiTrumpName$location)) %in% coordinates$City,]
+  antiLocations<-dplyr::select(antiTrumpName,location)
+  antiDots<-dplyr::select(geocode(antiLocations$location),longitude,latitude)
+}
 
 Retweetlocations<-sapply(RetweetNames$screenName,function(x){getUser(x)$location})
 RetweetNames$location<-Retweetlocations
 RetweetNames<-filter(RetweetNames, location!="",location!="NULL")
-RetweetNames<-RetweetNames[tolower(gsub(",.*$", "", RetweetNames$location)) %in% coordinates$City,]
-RetweetLocations<-dplyr::select(RetweetNames,location)
-RetweetDots<-dplyr::select(geocode(RetweetLocations$location),longitude,latitude)
-
+if(RetweetNames[1,2]=="NULL")
+{
+  RetweetDots<-dplyr::select(geocode("Houston, Texas"),longitude,latitude)
+} else
+{
+  RetweetNames<-RetweetNames[tolower(gsub(",.*$", "", RetweetNames$location)) %in% coordinates$City,]
+  RetweetLocations<-dplyr::select(RetweetNames,location)
+  RetweetDots<-dplyr::select(geocode(RetweetLocations$location),longitude,latitude)
+}
 proDots$Trump2016<-"Trump Supporter"
 antiDots$Trump2016<-"Trump Hater"
 RetweetDots$Trump2016<-"Trump Retweet"
 finalDot<-rbind(proDots,antiDots,RetweetDots)
 
 
-#map of all points
+
 usa_center = as.numeric(geocode("United States"))
 USAMap = ggmap(get_googlemap(center=c(lon = usa_center[3],lat = usa_center[4]), scale=2, zoom=4), extent="device")
 finalMap<-USAMap +
-geom_point(aes(x=longitude, y=latitude,color = Trump2016), data=finalDot, alpha=0.8, size=2) +
+geom_point(aes(x=longitude, y=latitude,color = Trump2016), data=finalDot, alpha=0.8, size=3) +
   theme(legend.title = element_text(colour="black", size=10, 
                                     face="bold")) +
   scale_color_manual(values=c('Blue','Orange','Red'))
@@ -154,7 +169,7 @@ png(filename = '/Users/DaraLadje/Documents/TwitterBot/finalMap.png', width = 100
 finalMap
 dev.off()
 
-captions <- c("Who agrees with Donald Trump's tweets?", "Hey America! Big election coming up. Checkout the locations of people who post positively and negatively about Donald Trump.", "Where do Donald Trump Supporters live? Find out now.", "#FuckDonalTrump", "#ILoveMexicans", "See where people agree with what Trump says. Shocking.", "Upcoming ELection is huge.", "Why do people like Trump?", "Who would even retweet Donald Trump.")
+captions <- c("Who agrees with Donald Trump's tweets?", "Hey America! Big election coming up. Checkout the locations of people who post positively and negatively about Donald Trump.", "Where do Donald Trump Supporters live? Find out now.", "See where people agree with what Trump says. Shocking.", "Upcoming ELection is huge.", "Why do people like Trump?", "Who retweets Donald Trump?")
 tweet(sample(captions, 1), mediaPath = '/Users/DaraLadje/Documents/TwitterBot/finalMap.png')
 
 quit(save="no")
